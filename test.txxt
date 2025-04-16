@@ -1,0 +1,11 @@
+I want to write a script using python.
+This script should do computervision.
+I want a super lightweight computervision model and a strong robust one.
+I will be testing and debugging using my windows pc, but might choose to implement the lightweight script on a raspberry pi.
+The script should give me an interactive dashboard that allows me to control values to change detection parameters
+The dashboard should show 3 video feeds as well havving the following, 1 regular, 2 mask+contours, 3 infereneces.
+I want to be able to swap between detecting faces, fingers, shapes. Make this possible in the dashboard.
+Keep everything in one file so that it is easier to provide context back to you for debugging.
+Also maintain a log file for each run for debugging issues.
+I want the terminal output to also be modern and technically robust. It should also look beautiful, dont pront garbage data.
+Lets go for the implementation.
