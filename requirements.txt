@@ -1,0 +1,41 @@
+# ============================================================
+# NERF TURRET CV SYSTEM v3.0 - Dependencies (PC / GPU machine)
+# ============================================================
+
+# Core CV
+opencv-contrib-python>=4.9.0
+numpy>=1.24.0
+ultralytics>=8.3.0
+
+# Hand gesture recognition (MediaPipe Tasks API)
+mediapipe>=0.10.30
+
+# Face recognition
+face-recognition>=1.3.0
+dlib-bin>=20.0.0
+face-recognition-models
+setuptools
+
+# Tracking (Kalman filter + Hungarian algorithm)
+scipy>=1.11.0
+
+# Turret serial control
+pyserial>=3.5
+
+# Remote server
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.12
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+jinja2>=3.1.0
+websockets>=13.0
+
+# Config
+pyyaml>=6.0
+
+# Terminal UI
+rich>=13.7.0
+
+# Image handling
+Pillow>=10.0.0

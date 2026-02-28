@@ -1,0 +1,149 @@
+# ============================================================
+# NERF TURRET CV SYSTEM v3.0 - Configuration
+# ============================================================
+
+system:
+  platform: auto          # auto | pc | rpi
+  camera_index: 0
+  resolution: [640, 480]
+  fps: 30
+  headless: false         # true for RPi without display
+
+detection:
+  # Model options: yolo11n, yolo11s, yolo11m, yolov8n (rpi-friendly)
+  model_high: yolo11n.pt
+  model_lite: yolov8n.pt
+  active_model: high      # high | lite
+  confidence: 0.5
+  iou_threshold: 0.45
+  device: auto            # auto | cpu | cuda | mps
+  classes: [0]            # COCO class IDs to detect (0=person)
+  half_precision: true    # FP16 on CUDA for ~2x speed (auto-disabled on CPU)
+  temporal_smoothing: 0.3 # confidence smoothing across frames (0=off)
+
+tracking:
+  max_disappeared: 30     # frames before dropping a track
+  max_distance: 80        # max pixel distance for association
+  prediction_steps: 15    # how many frames to predict ahead
+  kalman_process_noise: 0.03
+  kalman_measurement_noise: 0.1
+  iou_weight: 0.4         # weight for IoU in hybrid cost (0=centroid only)
+  min_hits: 3             # consecutive hits before track is confirmed
+  trail_length: 60
+  reid_enabled: true      # store appearance histograms for re-identification
+
+faces:
+  enabled: true
+  recognition_tolerance: 0.5   # lower = stricter matching
+  safe_dir: data/faces/safe
+  hostile_dir: data/faces/hostile
+  unknown_is_hostile: false     # treat unknown faces as hostile
+  scan_interval: 5              # run face recognition every N frames
+  downscale: 0.5                # resize factor before detection (0.25 on RPi)
+  min_face_size: 40             # skip faces smaller than NxN pixels
+  blur_threshold: 50.0          # skip faces with Laplacian variance below this
+  top_k_voting: 3               # use top-K matches for voting
+
+gestures:
+  enabled: true
+  min_detection_confidence: 0.7
+  min_tracking_confidence: 0.5
+  model_path: data/models/hand_landmarker.task
+  actions:
+    open_palm: stop_tracking
+    fist: engage_target
+    thumbs_up: mark_safe
+    thumbs_down: mark_hostile
+    peace: toggle_mode
+    pointing: fire
+
+turret:
+  enabled: false
+  serial_port: COM3           # /dev/ttyUSB0 on Linux/RPi
+  baud_rate: 115200
+  pan_channel: 0
+  tilt_channel: 1
+  pan_limits: [0, 180]
+  tilt_limits: [30, 150]
+  pan_offset: 90              # center position
+  tilt_offset: 90
+  fire_duration_ms: 200
+  smoothing: 0.3              # servo movement smoothing factor (exponential mode)
+  motion_profile: trapezoidal # exponential | trapezoidal
+  max_acceleration: 45.0      # degrees/sec^2 (trapezoidal mode)
+  max_velocity: 120.0         # degrees/sec (trapezoidal mode)
+  command_rate_hz: 50         # max serial command rate
+  burst_count: 1              # rounds per fire command
+  burst_delay_ms: 100         # delay between burst rounds
+  patrol_pattern: sweep       # sweep | figure8 | random
+  patrol_speed: 2.0           # degrees per update step
+  patrol_waypoints: []        # custom waypoints [[pan,tilt], ...] (empty=auto)
+  pid:
+    kp: 0.45
+    ki: 0.01
+    kd: 0.15
+
+targeting:
+  fov_h: 60.0              # horizontal field of view (degrees)
+  fov_v: 45.0              # vertical field of view (degrees)
+  dead_zone_px: 8           # pixels from center to suppress jitter
+  lead_blend: 0.7           # predicted vs current position blend
+  on_target_threshold: 15.0 # pixels from center to count as on-target
+  adaptive_pid: true        # scale PID gains by error magnitude
+  priority_weights:
+    threat: 3.0
+    proximity: 1.0
+    confidence: 0.5
+
+performance:
+  # preset: auto | high | low
+  #   auto: detect hardware and pick (default)
+  #   high: full quality, all features (PC/GPU)
+  #   low:  aggressive frame-skip, downscale, reduced HUD (RPi / weak CPU)
+  preset: auto
+
+  target_fps: 25
+  detection_thread: true     # run detection in background thread
+  face_thread: true          # run face recognition in background thread
+  adaptive_skip: true        # auto-skip subsystems when FPS drops
+  degradation_order:         # order to disable subsystems under load
+    - gestures
+    - faces
+    - detection_resolution
+
+  # Frame skip: run expensive subsystems every N frames (1 = every frame)
+  detect_every_n_frames: 1
+  gesture_every_n_frames: 3
+
+  # Detection input resolution (null = use original frame size)
+  # Set to [320, 240] on RPi for big speedup
+  detect_resolution: null
+
+hud:
+  crosshair: true
+  trails: true
+  predictions: true
+  minimap: true
+  zoom_inset: true
+  compass: true
+  notifications: true
+  fps_graph: true
+  engagement_zone: true
+  target_lock_animation: true
+
+server:
+  enabled: true
+  host: 0.0.0.0
+  port: 8000
+  secret_key: CHANGE-ME-TO-A-LONG-RANDOM-STRING
+  admin_username: admin
+  admin_password: changeme    # CHANGE THIS BEFORE DEPLOYING
+  allow_remote_fire: false    # safety: require explicit enable
+  cors_origins: ["*"]         # CORS allowed origins
+  websocket_hz: 10            # WebSocket status push rate
+
+logging:
+  level: INFO                 # DEBUG | INFO | WARNING | ERROR
+  console_rich: true
+  file_logging: true
+  log_dir: logs

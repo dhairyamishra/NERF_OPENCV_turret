@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NERF Turret - Command Center v3.1</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        :root{
+            --bg:#0a0e17;--surface:#111827;--surface2:#1a2332;--border:#1e293b;
+            --text:#e2e8f0;--muted:#64748b;--accent:#3b82f6;
+            --green:#22c55e;--red:#ef4444;--yellow:#eab308;--cyan:#06b6d4;
+            --orange:#f97316;--radius:10px;
+        }
+        body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow:hidden;}
+
+        /* Login */
+        #login-screen{display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#0a0e17 0%,#111827 50%,#0f172a 100%);}
+        .login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:48px 40px;width:380px;box-shadow:0 25px 50px rgba(0,0,0,0.5);}
+        .login-box h1{font-size:1.6rem;margin-bottom:8px;text-align:center;color:var(--cyan);letter-spacing:2px;}
+        .login-box .subtitle{text-align:center;color:var(--muted);font-size:13px;margin-bottom:28px;}
+        .login-box input{width:100%;padding:12px 16px;margin-bottom:14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:14px;transition:border-color .2s;}
+        .login-box input:focus{outline:none;border-color:var(--accent);}
+        .login-box button{width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--cyan));border:none;border-radius:var(--radius);color:white;font-weight:700;cursor:pointer;font-size:14px;letter-spacing:1px;transition:opacity .2s;}
+        .login-box button:hover{opacity:0.9;}
+        .login-error{color:var(--red);font-size:13px;margin-top:10px;text-align:center;}
+
+        /* Main Layout */
+        #app{display:none;height:100vh;flex-direction:column;}
+        .header{display:flex;justify-content:space-between;align-items:center;padding:8px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+        .header h1{font-size:1rem;color:var(--cyan);letter-spacing:2px;font-weight:700;}
+        .header-right{display:flex;align-items:center;gap:10px;}
+        .status-pills{display:flex;gap:6px;flex-wrap:wrap;}
+        .pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:0.5px;}
+        .pill-green{background:rgba(34,197,94,0.15);color:var(--green);}
+        .pill-red{background:rgba(239,68,68,0.15);color:var(--red);}
+        .pill-yellow{background:rgba(234,179,8,0.15);color:var(--yellow);}
+        .pill-blue{background:rgba(59,130,246,0.15);color:var(--accent);}
+        .pill-cyan{background:rgba(6,182,212,0.15);color:var(--cyan);}
+        .conn-group{display:flex;align-items:center;gap:6px;}
+        .conn-indicator{width:8px;height:8px;border-radius:50%;background:var(--red);transition:background .3s;}
+        .conn-indicator.connected{background:var(--green);}
+        .conn-latency{font-size:10px;color:var(--muted);font-family:monospace;}
+
+        .main{display:grid;grid-template-columns:1fr 360px;gap:0;flex:1;overflow:hidden;}
+
+        /* Video */
+        .video-panel{padding:12px;display:flex;flex-direction:column;gap:8px;overflow:hidden;}
+        .video-container{flex:1;background:#000;border-radius:var(--radius);overflow:hidden;position:relative;min-height:0;cursor:pointer;}
+        .video-container img{width:100%;height:100%;object-fit:contain;display:block;}
+        .video-container.fullscreen{position:fixed;inset:0;z-index:3000;border-radius:0;}
+        .video-stats{position:absolute;bottom:8px;left:8px;font-size:11px;color:var(--green);font-family:'Cascadia Code','Fira Code',monospace;background:rgba(0,0,0,0.7);padding:4px 10px;border-radius:6px;}
+        .video-expand{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);border:none;color:white;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:14px;}
+        .video-expand:hover{background:rgba(0,0,0,0.8);}
+
+        /* Side Panel */
+        .side-panel{background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:10px;}
+        .side-panel::-webkit-scrollbar{width:6px;}
+        .side-panel::-webkit-scrollbar-track{background:transparent;}
+        .side-panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+        .card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;}
+        .card h3{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px;font-weight:600;display:flex;justify-content:space-between;align-items:center;}
+        .card h3 .card-badge{font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(6,182,212,0.15);color:var(--cyan);}
+
+        /* Buttons */
+        .btn-row{display:flex;gap:6px;flex-wrap:wrap;}
+        .btn{padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);cursor:pointer;font-size:11px;font-weight:500;transition:all .15s;letter-spacing:0.3px;user-select:none;}
+        .btn:hover{background:var(--border);}
+        .btn-danger{border-color:var(--red);color:var(--red);}
+        .btn-danger:hover{background:rgba(239,68,68,0.15);}
+        .btn-success{border-color:var(--green);color:var(--green);}
+        .btn-success:hover{background:rgba(34,197,94,0.15);}
+        .btn-active{background:var(--accent)!important;border-color:var(--accent)!important;color:white!important;}
+        .btn-sm{padding:4px 8px;font-size:10px;}
+
+        /* Mode Selector */
+        .mode-btns{display:flex;gap:4px;}
+        .mode-btns .btn{flex:1;text-align:center;font-size:11px;padding:7px 4px;}
+
+        /* D-Pad + Turret */
+        .turret-ctrl-grid{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;}
+        .dpad{display:grid;grid-template-areas:"." "up" "." "left" "center" "right" "." "down" ".";grid-template-columns:36px 36px 36px;grid-template-rows:36px 36px 36px;gap:3px;}
+        .dpad button{border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .12s;user-select:none;}
+        .dpad button:hover{background:var(--border);}
+        .dpad button:active,.dpad button.held{background:var(--accent);color:white;transform:scale(0.95);}
+        .dpad .up{grid-area:up;}.dpad .down{grid-area:down;}.dpad .left{grid-area:left;}.dpad .right{grid-area:right;}
+        .dpad .center{grid-area:center;background:var(--accent);border-color:var(--accent);color:white;font-size:12px;}
+        .turret-info{display:flex;flex-direction:column;gap:6px;}
+        .angle-display{display:flex;gap:8px;}
+        .angle-item{flex:1;background:var(--surface2);border-radius:8px;padding:6px 8px;text-align:center;}
+        .angle-item .lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+        .angle-item .val{font-size:16px;font-weight:700;color:var(--cyan);font-family:'Cascadia Code','Fira Code',monospace;}
+        .sensitivity-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);}
+        .sensitivity-row input[type=range]{flex:1;accent-color:var(--accent);height:4px;}
+        .sensitivity-row .sens-val{color:var(--cyan);font-family:monospace;min-width:20px;text-align:right;}
+        .turret-arc{width:100%;height:36px;}
+
+        /* Joystick */
+        .joystick-container{display:none;justify-content:center;padding:10px 0;}
+        .joystick-zone{width:120px;height:120px;border-radius:50%;background:var(--surface2);border:2px solid var(--border);position:relative;touch-action:none;}
+        .joystick-knob{width:40px;height:40px;border-radius:50%;background:var(--accent);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);transition:none;pointer-events:none;}
+
+        /* Targets */
+        .target-item{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:8px;margin-bottom:3px;background:var(--surface2);font-size:12px;cursor:pointer;transition:all .15s;border:1px solid transparent;}
+        .target-item:hover{border-color:var(--accent);}
+        .target-item .threat-safe{color:var(--green);}
+        .target-item .threat-hostile{color:var(--red);}
+        .target-item .threat-unknown{color:var(--yellow);}
+
+        /* Stats */
+        .stat-row{display:flex;justify-content:space-between;padding:3px 0;font-size:12px;}
+        .stat-row .label{color:var(--muted);}
+        .stat-row .value{font-family:'Cascadia Code','Fira Code',monospace;color:var(--cyan);}
+
+        /* Face Gallery */
+        .face-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;margin-top:6px;max-height:180px;overflow-y:auto;}
+        .face-card{background:var(--surface2);border-radius:8px;padding:6px;text-align:center;position:relative;border:1px solid var(--border);transition:border-color .15s;}
+        .face-card:hover{border-color:var(--accent);}
+        .face-card .face-avatar{width:44px;height:44px;border-radius:50%;margin:0 auto 4px;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;overflow:hidden;}
+        .face-card .face-avatar img{width:100%;height:100%;object-fit:cover;}
+        .face-card .face-name{font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .face-card .face-threat{font-size:9px;text-transform:uppercase;letter-spacing:0.5px;}
+        .face-card .face-threat.safe{color:var(--green);}
+        .face-card .face-threat.hostile{color:var(--red);}
+        .face-card .face-count{font-size:9px;color:var(--muted);}
+        .face-card .face-actions{position:absolute;top:2px;right:2px;display:none;gap:2px;}
+        .face-card:hover .face-actions{display:flex;}
+        .face-action-btn{background:rgba(0,0,0,0.6);border:none;color:white;font-size:10px;cursor:pointer;border-radius:4px;padding:1px 4px;line-height:1.4;}
+        .face-action-btn:hover{background:rgba(0,0,0,0.9);}
+        .face-action-btn.del{color:var(--red);}
+
+        /* Enrollment */
+        .enroll-section{margin-top:8px;}
+        .enroll-row{display:flex;gap:4px;}
+        .enroll-row input{flex:1;padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:11px;}
+        .enroll-row input:focus{outline:none;border-color:var(--accent);}
+        .enroll-row select{padding:6px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:11px;}
+        .enroll-progress{margin-top:6px;display:none;}
+        .enroll-progress .progress-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+        .enroll-progress .progress-fill{height:100%;background:var(--accent);transition:width .3s;border-radius:3px;}
+        .enroll-progress .progress-label{font-size:10px;color:var(--muted);margin-top:3px;text-align:center;}
+
+        /* Radar Canvas */
+        .radar-container{display:flex;justify-content:center;padding:2px 0;}
+        .radar-canvas{border-radius:50%;background:var(--bg);}
+
+        /* Activity Log */
+        .log-container{max-height:100px;overflow-y:auto;font-size:10px;font-family:'Cascadia Code','Fira Code',monospace;}
+        .log-container::-webkit-scrollbar{width:4px;}
+        .log-container::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+        .log-entry{padding:2px 0;color:var(--muted);border-bottom:1px solid var(--border);}
+        .log-entry .log-time{color:var(--cyan);margin-right:4px;}
+        .log-entry .log-type{color:var(--yellow);margin-right:4px;text-transform:uppercase;}
+
+        /* Toast */
+        .toast-container{position:fixed;top:50px;right:20px;z-index:4000;display:flex;flex-direction:column;gap:8px;}
+        .toast{padding:10px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;color:white;animation:toast-in .3s ease;box-shadow:0 8px 24px rgba(0,0,0,0.4);}
+        .toast-info{background:linear-gradient(135deg,#3b82f6,#2563eb);}
+        .toast-success{background:linear-gradient(135deg,#22c55e,#16a34a);}
+        .toast-warning{background:linear-gradient(135deg,#eab308,#ca8a04);color:#1e293b;}
+        .toast-error{background:linear-gradient(135deg,#ef4444,#dc2626);}
+        .toast-exit{animation:toast-out .3s ease forwards;}
+        @keyframes toast-in{from{transform:translateX(100px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+        @keyframes toast-out{from{transform:translateX(0);opacity:1;}to{transform:translateX(100px);opacity:0;}}
+
+        /* Modals */
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:5000;align-items:center;justify-content:center;}
+        .modal-overlay.active{display:flex;}
+        .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;max-width:440px;width:90%;}
+        .modal h2{color:var(--cyan);margin-bottom:16px;font-size:1.1rem;letter-spacing:1px;}
+        .modal .key-row{display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);}
+        .modal .key-row kbd{background:var(--bg);padding:2px 8px;border-radius:4px;font-family:monospace;border:1px solid var(--border);font-size:11px;}
+
+        /* Toggle Switches */
+        .toggle-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+        .toggle-item{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:8px;background:var(--surface2);font-size:11px;}
+        .toggle-item .toggle-label{color:var(--text);font-weight:500;user-select:none;}
+        .toggle-switch{position:relative;width:32px;height:18px;flex-shrink:0;}
+        .toggle-switch input{opacity:0;width:0;height:0;position:absolute;}
+        .toggle-slider{position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:18px;transition:.2s;}
+        .toggle-slider:before{content:"";position:absolute;width:14px;height:14px;left:2px;bottom:2px;background:var(--muted);border-radius:50%;transition:.2s;}
+        .toggle-switch input:checked + .toggle-slider{background:var(--accent);}
+        .toggle-switch input:checked + .toggle-slider:before{transform:translateX(14px);background:#fff;}
+        .toggle-section-label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:5px 0 2px;font-weight:600;}
+
+        /* Responsive */
+        @media(max-width:900px){
+            .main{grid-template-columns:1fr;grid-template-rows:1fr auto;}
+            .side-panel{max-height:45vh;border-left:none;border-top:1px solid var(--border);}
+            .turret-ctrl-grid{grid-template-columns:1fr;}
+            .dpad{display:none;}
+            .joystick-container{display:flex;}
+        }
+        @media(max-width:500px){
+            .header h1{font-size:0.8rem;}
+            .pill{font-size:9px;padding:2px 6px;}
+        }
+    </style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="login-screen">
+    <div class="login-box">
+        <h1>NERF TURRET</h1>
+        <div class="subtitle">Command Center v3.1</div>
+        <input type="text" id="login-user" placeholder="Username" value="admin" autocomplete="username">
+        <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
+        <button onclick="doLogin()">ACCESS SYSTEM</button>
+        <div class="login-error" id="login-error"></div>
+    </div>
+</div>
+
+<!-- Main App -->
+<div id="app">
+    <div class="header">
+        <h1>NERF TURRET COMMAND CENTER</h1>
+        <div class="header-right">
+            <div class="status-pills">
+                <span class="pill pill-blue" id="pill-mode">IDLE</span>
+                <span class="pill pill-green" id="pill-armed">DISARMED</span>
+                <span class="pill pill-cyan" id="pill-model">--</span>
+                <span class="pill pill-green" id="pill-fps">0 FPS</span>
+            </div>
+            <div class="conn-group">
+                <div class="conn-indicator" id="conn-dot" title="Connection status"></div>
+                <span class="conn-latency" id="conn-latency"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="video-panel">
+            <div class="video-container" id="video-container">
+                <img id="video-feed" src="/api/stream" alt="Live Feed">
+                <div class="video-stats" id="video-stats">Connecting...</div>
+                <button class="video-expand" id="video-expand" title="Toggle fullscreen">&#x26F6;</button>
+            </div>
+        </div>
+
+        <div class="side-panel">
+            <!-- System Mode -->
+            <div class="card">
+                <h3>System Mode</h3>
+                <div class="mode-btns">
+                    <button class="btn" data-mode="tracking" onclick="setMode('tracking')">TRACK</button>
+                    <button class="btn" data-mode="patrol" onclick="setMode('patrol')">PATROL</button>
+                    <button class="btn" data-mode="manual" onclick="setMode('manual')">MANUAL</button>
+                    <button class="btn" data-mode="idle" onclick="setMode('idle')">IDLE</button>
+                </div>
+            </div>
+
+            <!-- Turret Control -->
+            <div class="card">
+                <h3>Turret Control</h3>
+                <div class="turret-ctrl-grid">
+                    <div class="dpad" id="dpad">
+                        <button class="up" data-dp="0" data-dt="-1">&#9650;</button>
+                        <button class="left" data-dp="-1" data-dt="0">&#9664;</button>
+                        <button class="center" onclick="centerTurret()">&#8982;</button>
+                        <button class="right" data-dp="1" data-dt="0">&#9654;</button>
+                        <button class="down" data-dp="0" data-dt="1">&#9660;</button>
+                    </div>
+                    <div class="turret-info">
+                        <div class="angle-display">
+                            <div class="angle-item"><div class="lbl">Pan</div><div class="val" id="pan-val">90</div></div>
+                            <div class="angle-item"><div class="lbl">Tilt</div><div class="val" id="tilt-val">90</div></div>
+                        </div>
+                        <svg class="turret-arc" id="turret-arc" viewBox="0 0 200 40"></svg>
+                        <div class="sensitivity-row">
+                            <span>Speed</span>
+                            <input type="range" id="turret-sensitivity" min="1" max="15" value="5">
+                            <span class="sens-val" id="sens-val">5</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="joystick-container" id="joystick-area">
+                    <div class="joystick-zone" id="joystick-zone">
+                        <div class="joystick-knob" id="joystick-knob"></div>
+                    </div>
+                </div>
+                <div class="btn-row" style="margin-top:8px;">
+                    <button class="btn btn-danger" id="btn-arm" onclick="toggleArm()">ARM</button>
+                    <button class="btn btn-danger" onclick="fireTurret()">FIRE</button>
+                    <button class="btn" onclick="centerTurret()">CENTER</button>
+                </div>
+            </div>
+
+            <!-- Subsystem Toggles -->
+            <div class="card">
+                <h3>Subsystems <span class="card-badge">toggles</span></h3>
+                <div class="toggle-grid">
+                    <div class="toggle-item"><span class="toggle-label">Detection</span><label class="toggle-switch"><input type="checkbox" data-toggle="detection" checked onchange="toggleSubsystem('detection',this.checked)"><span class="toggle-slider"></span></label></div>
+                    <div class="toggle-item"><span class="toggle-label">Tracking</span><label class="toggle-switch"><input type="checkbox" data-toggle="tracking" checked onchange="toggleSubsystem('tracking',this.checked)"><span class="toggle-slider"></span></label></div>
+                    <div class="toggle-item"><span class="toggle-label">Faces</span><label class="toggle-switch"><input type="checkbox" data-toggle="faces" checked onchange="toggleSubsystem('faces',this.checked)"><span class="toggle-slider"></span></label></div>
+                    <div class="toggle-item"><span class="toggle-label">Gestures</span><label class="toggle-switch"><input type="checkbox" data-toggle="gestures" checked onchange="toggleSubsystem('gestures',this.checked)"><span class="toggle-slider"></span></label></div>
+                    <div class="toggle-item"><span class="toggle-label">Turret</span><label class="toggle-switch"><input type="checkbox" data-toggle="turret" checked onchange="toggleSubsystem('turret',this.checked)"><span class="toggle-slider"></span></label></div>
+                    <div class="toggle-item"><span class="toggle-label">HUD</span><label class="toggle-switch"><input type="checkbox" data-toggle="hud" checked onchange="toggleSubsystem('hud',this.checked)"><span class="toggle-slider"></span></label></div>
+                </div>
+                <div class="toggle-section-label" style="margin-top:8px;">HUD Elements</div>
+                <div class="toggle-grid">
+                    <div class="toggle-item"><span class="toggle-label">Crosshair</span><label class="toggle-switch"><input type="checkbox" data-toggle="hud_crosshair" checked onchange="toggleSubsystem('hud_crosshair',this.checked)"><span class="toggle-slider"></span></label></div>
+                    <div class="toggle-item"><span class="toggle-label">Trails</span><label class="toggle-switch"><input type="checkbox" data-toggle="hud_trails" checked onchange="toggleSubsystem('hud_trails',this.checked)"><span class="toggle-slider"></span></label></div>
+                    <div class="toggle-item"><span class="toggle-label">Predict</span><label class="toggle-switch"><input type="checkbox" data-toggle="hud_predictions" checked onchange="toggleSubsystem('hud_predictions',this.checked)"><span class="toggle-slider"></span></label></div>
+                    <div class="toggle-item"><span class="toggle-label">Minimap</span><label class="toggle-switch"><input type="checkbox" data-toggle="hud_minimap" checked onchange="toggleSubsystem('hud_minimap',this.checked)"><span class="toggle-slider"></span></label></div>
+                    <div class="toggle-item"><span class="toggle-label">Zoom</span><label class="toggle-switch"><input type="checkbox" data-toggle="hud_zoom" checked onchange="toggleSubsystem('hud_zoom',this.checked)"><span class="toggle-slider"></span></label></div>
+                    <div class="toggle-item"><span class="toggle-label">Compass</span><label class="toggle-switch"><input type="checkbox" data-toggle="hud_compass" checked onchange="toggleSubsystem('hud_compass',this.checked)"><span class="toggle-slider"></span></label></div>
+                    <div class="toggle-item"><span class="toggle-label">Notifs</span><label class="toggle-switch"><input type="checkbox" data-toggle="hud_notifications" checked onchange="toggleSubsystem('hud_notifications',this.checked)"><span class="toggle-slider"></span></label></div>
+                    <div class="toggle-item"><span class="toggle-label">Radar</span><label class="toggle-switch"><input type="checkbox" data-toggle="hud_radar" checked onchange="toggleSubsystem('hud_radar',this.checked)"><span class="toggle-slider"></span></label></div>
+                </div>
+            </div>
+
+            <!-- Radar + Detector -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div class="card">
+                    <h3>Radar</h3>
+                    <div class="radar-container"><canvas id="radar-canvas" class="radar-canvas" width="130" height="130"></canvas></div>
+                </div>
+                <div class="card">
+                    <h3>Detector</h3>
+                    <div class="btn-row" style="margin-bottom:6px;">
+                        <button class="btn btn-sm" id="btn-high" onclick="switchModel('high')">HIGH</button>
+                        <button class="btn btn-sm" id="btn-lite" onclick="switchModel('lite')">LITE</button>
+                    </div>
+                    <div class="stat-row"><span class="label">Inference</span><span class="value" id="inf-time">--</span></div>
+                    <div class="stat-row"><span class="label">Pipeline</span><span class="value" id="pipe-fps">--</span></div>
+                    <div class="stat-row"><span class="label">Cam FPS</span><span class="value" id="cam-fps">--</span></div>
+                </div>
+            </div>
+
+            <!-- Active Targets -->
+            <div class="card">
+                <h3>Targets <span class="card-badge" id="target-count">0</span></h3>
+                <div id="target-list" style="max-height:100px;overflow-y:auto;"><span style="color:var(--muted);font-size:12px;">No targets</span></div>
+            </div>
+
+            <!-- Face Database -->
+            <div class="card">
+                <h3>Face Database <span class="card-badge" id="face-badge">0</span></h3>
+                <div class="stat-row">
+                    <span class="label">Safe / Hostile</span>
+                    <span class="value" id="face-counts">0 / 0</span>
+                </div>
+                <div id="face-gallery" class="face-gallery"></div>
+                <div class="enroll-section">
+                    <div class="enroll-row">
+                        <input type="text" id="face-name" placeholder="Name">
+                        <select id="face-threat">
+                            <option value="safe">Safe</option>
+                            <option value="hostile">Hostile</option>
+                        </select>
+                        <button class="btn btn-success btn-sm" onclick="enrollFace()" title="Quick enroll (1 frame)">+</button>
+                        <button class="btn btn-sm" id="btn-multi-enroll" onclick="startMultiEnroll()" title="Multi-frame enroll (5 frames)">5x</button>
+                    </div>
+                    <div class="enroll-progress" id="enroll-progress">
+                        <div class="progress-bar"><div class="progress-fill" id="enroll-fill" style="width:0%"></div></div>
+                        <div class="progress-label" id="enroll-label">0 / 5 frames</div>
+                    </div>
+                </div>
+                <div class="btn-row" style="margin-top:6px;">
+                    <button class="btn btn-sm" onclick="rebuildFaces()">Rebuild DB</button>
+                    <button class="btn btn-sm" onclick="loadFaceGallery()">Refresh</button>
+                </div>
+            </div>
+
+            <!-- Activity Log -->
+            <div class="card">
+                <h3>Activity Log</h3>
+                <div class="log-container" id="log-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- Keyboard Help Modal -->
+<div class="modal-overlay" id="help-modal">
+    <div class="modal">
+        <h2>Keyboard Shortcuts</h2>
+        <div class="key-row"><span>Move turret</span><kbd>Arrow Keys</kbd></div>
+        <div class="key-row"><span>Fire</span><kbd>Space</kbd></div>
+        <div class="key-row"><span>Toggle arm</span><kbd>A</kbd></div>
+        <div class="key-row"><span>Center turret</span><kbd>C</kbd></div>
+        <div class="key-row"><span>Cycle mode</span><kbd>T</kbd></div>
+        <div class="key-row"><span>Switch model</span><kbd>M</kbd></div>
+        <div class="key-row"><span>Fullscreen video</span><kbd>F</kbd></div>
+        <div class="key-row"><span>Show help</span><kbd>?</kbd></div>
+        <div class="key-row"><span>Close</span><kbd>Esc</kbd></div>
+        <br>
+        <button class="btn" onclick="document.getElementById('help-modal').classList.remove('active')" style="width:100%;">Close</button>
+    </div>
+</div>
+
+<script>
+let TOKEN = null;
+let ws = null;
+let wsReconnectTimer = null;
+let wsLastMsg = 0;
+let turretSensitivity = 5;
+let multiEnrollActive = false;
+let multiEnrollInterval = null;
+const API = '';
+
+// ── Utility ──────────────────────────────────────────
+
+async function apiFetch(path, opts = {}) {
+    const headers = {'Content-Type':'application/json', ...(opts.headers||{})};
+    if (TOKEN) headers['Authorization'] = `Bearer ${TOKEN}`;
+    const res = await fetch(API + path, {...opts, headers});
+    if (res.status === 401) { TOKEN = null; showLogin(); throw new Error('Unauthorized'); }
+    return res;
+}
+
+function showLogin() {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+}
+function showApp() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+}
+
+function showToast(msg, type='info') {
+    const container = document.getElementById('toast-container');
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.textContent = msg;
+    container.appendChild(el);
+    setTimeout(() => { el.classList.add('toast-exit'); setTimeout(() => el.remove(), 300); }, 3000);
+}
+
+// ── Login ────────────────────────────────────────────
+
+async function doLogin() {
+    const user = document.getElementById('login-user').value;
+    const pass = document.getElementById('login-pass').value;
+    try {
+        const res = await fetch(API + '/api/login', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({username:user, password:pass})
+        });
+        if (!res.ok) { document.getElementById('login-error').textContent='Invalid credentials'; return; }
+        const data = await res.json();
+        TOKEN = data.access_token;
+        showApp();
+        connectWebSocket();
+        loadFaceGallery();
+        showToast('Connected to system', 'success');
+    } catch(e) { document.getElementById('login-error').textContent='Connection error'; }
+}
+
+// ── WebSocket ────────────────────────────────────────
+
+function connectWebSocket() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${proto}//${location.host}/ws/status`);
+
+    ws.onopen = () => {
+        document.getElementById('conn-dot').classList.add('connected');
+        if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+    };
+
+    ws.onmessage = (e) => {
+        const now = performance.now();
+        const latency = wsLastMsg > 0 ? Math.round(now - wsLastMsg) : 0;
+        wsLastMsg = now;
+        document.getElementById('conn-latency').textContent = latency > 0 ? latency + 'ms' : '';
+        try { updateUI(JSON.parse(e.data)); } catch(err) {}
+    };
+
+    ws.onclose = () => {
+        document.getElementById('conn-dot').classList.remove('connected');
+        document.getElementById('conn-latency').textContent = '';
+        wsReconnectTimer = setTimeout(connectWebSocket, 2000);
+    };
+
+    ws.onerror = () => ws.close();
+}
+
+function wsSend(cmd) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(cmd));
+    }
+}
+
+// ── UI Update ────────────────────────────────────────
+
+function updateUI(d) {
+    document.getElementById('pill-mode').textContent = d.mode.toUpperCase();
+    const armPill = document.getElementById('pill-armed');
+    armPill.textContent = d.armed ? 'ARMED' : 'DISARMED';
+    armPill.className = 'pill ' + (d.armed ? 'pill-red' : 'pill-green');
+    document.getElementById('pill-fps').textContent = d.camera_fps + ' FPS';
+    document.getElementById('pill-model').textContent = d.detector_model;
+    document.getElementById('inf-time').textContent = d.inference_ms + 'ms';
+    document.getElementById('cam-fps').textContent = d.camera_fps;
+    document.getElementById('video-stats').textContent = `${d.camera_fps} FPS | ${d.inference_ms}ms | ${d.mode.toUpperCase()}`;
+
+    if (d.metrics && d.metrics.pipeline_fps) {
+        document.getElementById('pipe-fps').textContent = d.metrics.pipeline_fps;
+    }
+
+    if (d.turret) {
+        document.getElementById('pan-val').textContent = Math.round(d.turret.pan);
+        document.getElementById('tilt-val').textContent = Math.round(d.turret.tilt);
+        drawTurretArc(d.turret.pan, d.turret.tilt);
+        const armBtn = document.getElementById('btn-arm');
+        if (d.armed) { armBtn.textContent = 'DISARM'; armBtn.classList.add('btn-active'); }
+        else { armBtn.textContent = 'ARM'; armBtn.classList.remove('btn-active'); }
+    }
+    if (d.faces) {
+        document.getElementById('face-counts').textContent = `${d.faces.unique_safe||0} / ${d.faces.unique_hostile||0}`;
+        document.getElementById('face-badge').textContent = (d.faces.unique_safe||0) + (d.faces.unique_hostile||0);
+    }
+
+    const targets = d.targets || {};
+    const tids = Object.keys(targets);
+    document.getElementById('target-count').textContent = tids.length;
+
+    const tl = document.getElementById('target-list');
+    if (tids.length === 0) {
+        tl.innerHTML = '<span style="color:var(--muted);font-size:12px;">No targets</span>';
+    } else {
+        tl.innerHTML = tids.map(id => {
+            const t = targets[id];
+            const tc = t.threat === 'safe' ? 'threat-safe' : t.threat === 'hostile' ? 'threat-hostile' : 'threat-unknown';
+            const label = t.face_name || `Target #${id}`;
+            const pri = t.primary ? ' <span style="color:var(--orange)">&#x25C9;</span>' : '';
+            return `<div class="target-item" onclick="selectTarget(${id})"><span>${label}${pri}</span><span class="${tc}">${t.threat.toUpperCase()} ${(t.confidence*100).toFixed(0)}%</span></div>`;
+        }).join('');
+    }
+
+    document.querySelectorAll('.mode-btns .btn').forEach(b => b.classList.toggle('btn-active', b.dataset.mode === d.mode));
+    drawRadar(targets, d.turret);
+    if (d.toggles) syncToggles(d.toggles);
+
+    if (d.events) {
+        const logC = document.getElementById('log-container');
+        logC.innerHTML = d.events.slice(-20).reverse().map(ev => {
+            const t = new Date(ev.time * 1000);
+            return `<div class="log-entry"><span class="log-time">${t.toLocaleTimeString()}</span><span class="log-type">${ev.type}</span>${ev.message}</div>`;
+        }).join('');
+    }
+}
+
+// ── Turret Arc Visualization ─────────────────────────
+
+function drawTurretArc(pan, tilt) {
+    const svg = document.getElementById('turret-arc');
+    if (!svg) return;
+    const w = 200, h = 40, y = h - 4;
+    const px = 10 + (pan / 180) * (w - 20);
+    svg.innerHTML = `
+        <line x1="10" y1="${y}" x2="${w-10}" y2="${y}" stroke="#1e293b" stroke-width="2" stroke-linecap="round"/>
+        <line x1="${w/2}" y1="${y-3}" x2="${w/2}" y2="${y+3}" stroke="#64748b" stroke-width="1"/>
+        <line x1="10" y1="${y-2}" x2="10" y2="${y+2}" stroke="#64748b" stroke-width="1"/>
+        <line x1="${w-10}" y1="${y-2}" x2="${w-10}" y2="${y+2}" stroke="#64748b" stroke-width="1"/>
+        <circle cx="${px}" cy="${y}" r="5" fill="#3b82f6" stroke="#93c5fd" stroke-width="1.5"/>
+        <text x="10" y="12" fill="#64748b" font-size="8" font-family="monospace">0</text>
+        <text x="${w/2-4}" y="12" fill="#64748b" font-size="8" font-family="monospace">90</text>
+        <text x="${w-22}" y="12" fill="#64748b" font-size="8" font-family="monospace">180</text>
+        <text x="${Math.max(10,Math.min(w-22,px-6))}" y="${y-10}" fill="#06b6d4" font-size="9" font-weight="bold" font-family="monospace">${Math.round(pan)}</text>`;
+}
+
+// ── Radar Canvas ─────────────────────────────────────
+
+function drawRadar(targets, turret) {
+    const canvas = document.getElementById('radar-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height, cx = w/2, cy = h/2, r = w/2 - 4;
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle = '#0a1a0a'; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#1a3a1a'; ctx.lineWidth = 1;
+    for (let i = 1; i <= 3; i++) { ctx.beginPath(); ctx.arc(cx,cy,r*i/3,0,Math.PI*2); ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(cx-r,cy); ctx.lineTo(cx+r,cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx,cy-r); ctx.lineTo(cx,cy+r); ctx.stroke();
+    const sr = ((Date.now()/15) % 360) * Math.PI/180;
+    const grad = ctx.createLinearGradient(cx,cy,cx+r*Math.cos(sr),cy+r*Math.sin(sr));
+    grad.addColorStop(0,'rgba(0,255,0,0.3)'); grad.addColorStop(1,'rgba(0,255,0,0)');
+    ctx.strokeStyle = grad; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+r*Math.cos(sr),cy+r*Math.sin(sr)); ctx.stroke();
+    const tids = Object.keys(targets||{}), colorMap = {safe:'#22c55e',hostile:'#ef4444',unknown:'#eab308'}, fw=640, fh=480;
+    tids.forEach(id => {
+        const t = targets[id];
+        const dx = ((t.center[0]-fw/2)/(fw/2))*r, dy = ((t.center[1]-fh/2)/(fh/2))*r;
+        const dist = Math.hypot(dx,dy), scale = dist > r-2 ? (r-2)/dist : 1;
+        ctx.fillStyle = colorMap[t.threat]||colorMap.unknown;
+        ctx.beginPath(); ctx.arc(cx+dx*scale, cy+dy*scale, t.primary?4:3, 0, Math.PI*2); ctx.fill();
+        if (t.primary) { ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx+dx*scale,cy+dy*scale,7,0,Math.PI*2); ctx.stroke(); }
+    });
+    ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(cx,cy,2,0,Math.PI*2); ctx.fill();
+}
+
+// ── Actions ──────────────────────────────────────────
+
+async function setMode(mode) {
+    wsSend({action:'mode', mode});
+    document.querySelectorAll('.mode-btns .btn').forEach(b => b.classList.toggle('btn-active', b.dataset.mode === mode));
+    showToast(`Mode: ${mode.toUpperCase()}`, 'info');
+}
+
+function moveTurret(dp, dt) { wsSend({action:'move', pan:dp*turretSensitivity, tilt:dt*turretSensitivity}); }
+function centerTurret() { wsSend({action:'center'}); }
+
+async function toggleArm() {
+    const btn = document.getElementById('btn-arm');
+    if (btn.textContent === 'ARM') {
+        if (!confirm('ARM the turret?')) return;
+        wsSend({action:'arm'}); showToast('TURRET ARMED', 'warning');
+    } else {
+        wsSend({action:'disarm'}); showToast('Turret disarmed', 'success');
+    }
+}
+
+async function fireTurret() {
+    if (!confirm('FIRE?')) return;
+    wsSend({action:'fire'}); showToast('FIRE!', 'error');
+}
+
+function switchModel(type) { wsSend({action:'switch_model', model:type}); showToast(`Model: ${type.toUpperCase()}`, 'info'); }
+function selectTarget(id) { wsSend({action:'select_target', target_id:id}); }
+
+// ── Face Management ──────────────────────────────────
+
+async function loadFaceGallery() {
+    try {
+        const res = await apiFetch('/api/faces/list');
+        const data = await res.json();
+        const gallery = document.getElementById('face-gallery');
+        const people = data.people || [];
+        if (people.length === 0) {
+            gallery.innerHTML = '<span style="color:var(--muted);font-size:11px;grid-column:1/-1;">No enrolled faces</span>';
+            return;
+        }
+        gallery.innerHTML = people.map(p => {
+            const initials = p.name.slice(0,2).toUpperCase();
+            const tc = p.threat_level === 'safe' ? 'safe' : 'hostile';
+            const flipThreat = tc === 'safe' ? 'hostile' : 'safe';
+            return `<div class="face-card">
+                <div class="face-actions">
+                    <button class="face-action-btn" onclick="reclassifyFace('${p.name}','${flipThreat}')" title="Reclassify to ${flipThreat}">${tc==='safe'?'&#x26A0;':'&#x2714;'}</button>
+                    <button class="face-action-btn del" onclick="deleteFace('${p.name}')" title="Delete">&#x2715;</button>
+                </div>
+                <div class="face-avatar">${initials}</div>
+                <div class="face-name" title="${p.name}">${p.name}</div>
+                <div class="face-threat ${tc}">${p.threat_level}</div>
+                <div class="face-count">${p.encoding_count} enc</div>
+            </div>`;
+        }).join('');
+    } catch(e) { console.error('Face gallery load failed:', e); }
+}
+
+async function enrollFace() {
+    const name = document.getElementById('face-name').value.trim();
+    const threat = document.getElementById('face-threat').value;
+    if (!name) { showToast('Enter a name first', 'warning'); return; }
+    try {
+        const res = await apiFetch('/api/faces/enroll', {method:'POST', body:JSON.stringify({name, threat_level:threat})});
+        if (res.ok) {
+            document.getElementById('face-name').value = '';
+            showToast(`Enrolled: ${name} (${threat})`, 'success');
+            loadFaceGallery();
+        } else {
+            const err = await res.json();
+            showToast(err.detail || 'Enrollment failed', 'error');
+        }
+    } catch(e) { showToast('Enrollment error', 'error'); }
+}
+
+async function startMultiEnroll() {
+    const name = document.getElementById('face-name').value.trim();
+    const threat = document.getElementById('face-threat').value;
+    if (!name) { showToast('Enter a name first', 'warning'); return; }
+
+    if (multiEnrollActive) { cancelMultiEnroll(); return; }
+
+    multiEnrollActive = true;
+    const btn = document.getElementById('btn-multi-enroll');
+    btn.textContent = 'STOP';
+    btn.classList.add('btn-active');
+    const prog = document.getElementById('enroll-progress');
+    prog.style.display = 'block';
+
+    multiEnrollInterval = setInterval(async () => {
+        try {
+            const res = await apiFetch('/api/faces/enroll/multi', {method:'POST', body:JSON.stringify({name, threat_level:threat})});
+            const data = await res.json();
+            const pct = (data.captured / data.target) * 100;
+            document.getElementById('enroll-fill').style.width = pct + '%';
+            document.getElementById('enroll-label').textContent = data.error
+                ? `${data.captured}/${data.target} - ${data.error}`
+                : `${data.captured} / ${data.target} frames`;
+            if (data.complete) {
+                showToast(`Enrolled ${name} with ${data.target} frames!`, 'success');
+                cancelMultiEnroll();
+                loadFaceGallery();
+            }
+        } catch(e) { showToast('Multi-enroll error', 'error'); cancelMultiEnroll(); }
+    }, 600);
+}
+
+function cancelMultiEnroll() {
+    multiEnrollActive = false;
+    if (multiEnrollInterval) { clearInterval(multiEnrollInterval); multiEnrollInterval = null; }
+    const btn = document.getElementById('btn-multi-enroll');
+    btn.textContent = '5x'; btn.classList.remove('btn-active');
+    document.getElementById('enroll-progress').style.display = 'none';
+    document.getElementById('enroll-fill').style.width = '0%';
+    apiFetch('/api/faces/enroll/cancel', {method:'POST'}).catch(() => {});
+}
+
+async function deleteFace(name) {
+    if (!confirm(`Delete all face data for "${name}"?`)) return;
+    try {
+        const res = await apiFetch(`/api/faces/${encodeURIComponent(name)}`, {method:'DELETE'});
+        if (res.ok) { showToast(`Deleted: ${name}`, 'info'); loadFaceGallery(); }
+        else { showToast('Delete failed', 'error'); }
+    } catch(e) { showToast('Delete error', 'error'); }
+}
+
+async function reclassifyFace(name, newThreat) {
+    if (!confirm(`Reclassify "${name}" as ${newThreat}?`)) return;
+    try {
+        const res = await apiFetch('/api/faces/reclassify', {method:'POST', body:JSON.stringify({name, new_threat_level:newThreat})});
+        if (res.ok) { showToast(`${name} -> ${newThreat}`, 'info'); loadFaceGallery(); }
+        else { showToast('Reclassify failed', 'error'); }
+    } catch(e) { showToast('Reclassify error', 'error'); }
+}
+
+async function rebuildFaces() {
+    await apiFetch('/api/faces/rebuild', {method:'POST'});
+    showToast('Face DB rebuilt', 'info');
+    loadFaceGallery();
+}
+
+// ── Toggle Subsystems ────────────────────────────────
+
+function toggleSubsystem(subsystem, enabled) {
+    wsSend({action:'toggle', subsystem, enabled});
+    showToast(`${subsystem}: ${enabled ? 'ON' : 'OFF'}`, enabled ? 'success' : 'warning');
+}
+
+function syncToggles(toggles) {
+    if (!toggles) return;
+    Object.entries(toggles).forEach(([key, val]) => {
+        const el = document.querySelector(`[data-toggle="${key}"]`);
+        if (el && el.checked !== val) el.checked = val;
+    });
+}
+
+// ── D-Pad Hold-to-Move ───────────────────────────────
+
+(function() {
+    const dpad = document.getElementById('dpad');
+    if (!dpad) return;
+    let holdTimer = null;
+    const btns = dpad.querySelectorAll('button[data-dp]');
+
+    function startHold(btn) {
+        const dp = parseFloat(btn.dataset.dp);
+        const dt = parseFloat(btn.dataset.dt);
+        btn.classList.add('held');
+        moveTurret(dp, dt);
+        holdTimer = setInterval(() => moveTurret(dp, dt), 120);
+    }
+
+    function stopHold() {
+        btns.forEach(b => b.classList.remove('held'));
+        if (holdTimer) { clearInterval(holdTimer); holdTimer = null; }
+    }
+
+    btns.forEach(btn => {
+        btn.addEventListener('mousedown', e => { e.preventDefault(); startHold(btn); });
+        btn.addEventListener('touchstart', e => { e.preventDefault(); startHold(btn); }, {passive:false});
+    });
+    document.addEventListener('mouseup', stopHold);
+    document.addEventListener('touchend', stopHold);
+})();
+
+// ── Sensitivity Slider ───────────────────────────────
+
+document.getElementById('turret-sensitivity').addEventListener('input', function() {
+    turretSensitivity = parseInt(this.value);
+    document.getElementById('sens-val').textContent = turretSensitivity;
+});
+
+// ── Fullscreen Video ─────────────────────────────────
+
+document.getElementById('video-expand').addEventListener('click', function(e) {
+    e.stopPropagation();
+    document.getElementById('video-container').classList.toggle('fullscreen');
+});
+
+// ── Keyboard Shortcuts ───────────────────────────────
+
+const modes = ['tracking','patrol','manual','idle'];
+let currentModeIdx = 0;
+
+document.addEventListener('keydown', e => {
+    if (!TOKEN) return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+    const map = {ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
+    if (map[e.key]) { e.preventDefault(); moveTurret(...map[e.key]); return; }
+    if (e.key === ' ') { e.preventDefault(); fireTurret(); return; }
+    if (e.key === 'a' || e.key === 'A') { e.preventDefault(); toggleArm(); return; }
+    if (e.key === 'c' || e.key === 'C') { e.preventDefault(); centerTurret(); return; }
+    if (e.key === 'f' || e.key === 'F') { e.preventDefault(); document.getElementById('video-container').classList.toggle('fullscreen'); return; }
+    if (e.key === 't' || e.key === 'T') {
+        e.preventDefault(); currentModeIdx = (currentModeIdx + 1) % modes.length; setMode(modes[currentModeIdx]); return;
+    }
+    if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        const current = document.getElementById('pill-model').textContent;
+        switchModel(current.includes('yolo11') || current.includes('high') ? 'lite' : 'high'); return;
+    }
+    if (e.key === '?') { e.preventDefault(); document.getElementById('help-modal').classList.toggle('active'); return; }
+    if (e.key === 'Escape') {
+        document.getElementById('help-modal').classList.remove('active');
+        document.getElementById('video-container').classList.remove('fullscreen');
+    }
+});
+
+// ── Virtual Joystick ─────────────────────────────────
+
+(function() {
+    const zone = document.getElementById('joystick-zone');
+    const knob = document.getElementById('joystick-knob');
+    if (!zone || !knob) return;
+    let dragging = false, sendInterval = null, joyX = 0, joyY = 0;
+
+    function getPos(e) {
+        const rect = zone.getBoundingClientRect();
+        const touch = e.touches ? e.touches[0] : e;
+        return { x: touch.clientX - rect.left - rect.width/2, y: touch.clientY - rect.top - rect.height/2 };
+    }
+
+    function onStart(e) {
+        e.preventDefault(); dragging = true;
+        sendInterval = setInterval(() => {
+            if (Math.abs(joyX) > 5 || Math.abs(joyY) > 5) moveTurret(joyX * 0.02, joyY * 0.02);
+        }, 100);
+    }
+
+    function onMove(e) {
+        if (!dragging) return; e.preventDefault();
+        const pos = getPos(e), maxR = zone.offsetWidth/2 - 20;
+        const dist = Math.hypot(pos.x, pos.y), scale = dist > maxR ? maxR/dist : 1;
+        joyX = pos.x * scale; joyY = pos.y * scale;
+        knob.style.transform = `translate(calc(-50% + ${joyX}px), calc(-50% + ${joyY}px))`;
+    }
+
+    function onEnd() {
+        dragging = false; joyX = 0; joyY = 0;
+        knob.style.transform = 'translate(-50%,-50%)';
+        if (sendInterval) { clearInterval(sendInterval); sendInterval = null; }
+    }
+
+    zone.addEventListener('mousedown', onStart);
+    zone.addEventListener('touchstart', onStart, {passive:false});
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('touchmove', onMove, {passive:false});
+    document.addEventListener('mouseup', onEnd);
+    document.addEventListener('touchend', onEnd);
+})();
+
+// Init turret arc
+drawTurretArc(90, 90);
+</script>
+</body>
+</html>

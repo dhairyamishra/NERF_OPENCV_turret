@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/*.log
+
+# Data - models are large
+data/models/*.pt
+data/models/*.onnx
+data/models/*.tflite
+data/models/*.engine
+
+# Face database images (privacy)
+# Uncomment below if you don't want to track face images
+# data/faces/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Environment variables
+.env

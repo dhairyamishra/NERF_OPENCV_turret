@@ -1,0 +1,44 @@
+# ============================================================
+# NERF TURRET CV SYSTEM - Dependencies (Raspberry Pi 4B)
+# ============================================================
+
+# Core CV (headless for RPi)
+opencv-contrib-python-headless>=4.9.0
+numpy>=1.24.0
+ultralytics>=8.3.0
+
+# Hand gesture (lighter build for RPi)
+mediapipe>=0.10.9
+
+# Face recognition
+face-recognition>=1.3.0
+dlib>=19.24.0
+
+# Tracking
+scipy>=1.11.0
+
+# Turret serial + GPIO
+pyserial>=3.5
+RPi.GPIO>=0.7.1
+pigpio>=1.78
+
+# RPi camera
+picamera2>=0.3.12
+
+# Remote server
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.12
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+jinja2>=3.1.0
+websockets>=13.0
+
+# Config
+pyyaml>=6.0
+
+# Terminal UI
+rich>=13.7.0
+
+# Image handling
+Pillow>=10.0.0
